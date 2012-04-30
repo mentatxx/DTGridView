@@ -11,7 +11,7 @@
 
 @interface DTGridViewController : UIViewController <DTGridViewDataSource, DTGridViewDelegate>
 
-@property (nonatomic, retain) DTGridView *gridView;
+@property (nonatomic, strong) DTGridView *gridView;
 
 @end
 
