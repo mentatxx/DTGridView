@@ -99,6 +99,8 @@ struct DTOutset {
 @optional
 - (NSInteger)spacingBetweenRowsInGridView:(DTGridView *)gridView;
 - (NSInteger)spacingBetweenColumnsInGridView:(DTGridView *)gridView;
+- (BOOL)heightForRowsIsConstant;
+- (BOOL)widthForColumnsIsConstant;
 
 @end
 
@@ -140,6 +142,11 @@ struct DTOutset {
 	
 	NSTimer *decelerationTimer;
 	NSTimer *draggingTimer;
+    
+    BOOL hasConstantRowHeight;
+    BOOL hasConstantColumnWidth;
+    NSInteger defaultRowHeight;
+    NSInteger defaultColumnWidth;
 }
 
 /*!
@@ -223,5 +230,11 @@ struct DTOutset {
  @abstract Call this to reload the grid view's data.
 */
 - (void)reloadData;
+
+/*!
+ @abstact Internally called to load cells in sight. And unload cells out of view
+*/
+- (void)loadCells;
+
 
 @end

@@ -106,6 +106,10 @@ NSInteger intSort(id info1, id info2, void *context) {
 	numberOfRows = DTGridViewInvalid;
 	columnIndexOfSelectedCell = DTGridViewInvalid;
 	rowIndexOfSelectedCell = DTGridViewInvalid;
+    hasConstantColumnWidth = NO;
+    hasConstantRowHeight = NO;
+    defaultColumnWidth = DTGridViewInvalid;
+    defaultRowHeight = DTGridViewInvalid;
 	
 	gridRows = [[NSMutableArray alloc] init];
 	rowPositions = [[NSMutableArray alloc] init];
@@ -149,11 +153,7 @@ NSInteger intSort(id info1, id info2, void *context) {
 	
 	[self loadData];
 	
-	for (UIView *v in self.subviews)
-        if ([v isKindOfClass:[DTGridViewCell class]])
-             [v removeFromSuperview];
-	
-	[self initialiseViews];
+    [self loadCells];
 	
 	[self didLoad];
 }
@@ -161,6 +161,16 @@ NSInteger intSort(id info1, id info2, void *context) {
 - (void)didLoad {
 	if ([self.delegate respondsToSelector:@selector(gridViewDidLoad:)])
 		[self.delegate gridViewDidLoad:self];
+}
+
+- (void)loadCells
+{
+    //
+	for (UIView *v in self.subviews)
+        if ([v isKindOfClass:[DTGridViewCell class]])
+            [v removeFromSuperview];
+	
+	[self initialiseViews];
 }
 
 - (void)didEndDragging {}
@@ -318,11 +328,15 @@ NSInteger intSort(id info1, id info2, void *context) {
 #pragma mark Finding Infomation from DataSource
 
 - (CGFloat)findWidthForRow:(NSInteger)row column:(NSInteger)column {
-	return [self.dataSource gridView:self widthForCellAtRow:row column:column];
+    if (hasConstantColumnWidth) {
+        return defaultColumnWidth;
+    } else {
+        return [self.dataSource gridView:self widthForCellAtRow:row column:column];
+    }
 }
 
 - (NSInteger)findNumberOfRows {
-	return [self.dataSource numberOfRowsInGridView:self];
+    return numberOfRows;
 }
 
 - (NSInteger)findNumberOfColumnsForRow:(NSInteger)row {
@@ -330,7 +344,11 @@ NSInteger intSort(id info1, id info2, void *context) {
 }
 
 - (CGFloat)findHeightForRow:(NSInteger)row {
-	return [self.dataSource gridView:self heightForRow:row];
+    if (hasConstantRowHeight) {
+        return defaultRowHeight;
+    } else {
+        return [self.dataSource gridView:self heightForRow:row];
+    }
 }
 
 - (DTGridViewCell *)findViewForRow:(NSInteger)row column:(NSInteger)column {
@@ -363,11 +381,25 @@ NSInteger intSort(id info1, id info2, void *context) {
 	if (![self.dataSource respondsToSelector:@selector(numberOfRowsInGridView:)])
 		return;
 	
-	self.numberOfRows = [self findNumberOfRows];
+	self.numberOfRows = [self.dataSource numberOfRowsInGridView:self];
 	
 	if (!self.numberOfRows)
 		return;
 	
+    // cache geometry
+    hasConstantRowHeight = [self.dataSource respondsToSelector:@selector(heightForRowsIsConstant)] ? [self.dataSource heightForRowsIsConstant] : NO;
+    hasConstantColumnWidth = [self.dataSource respondsToSelector:@selector(widthForColumnsIsConstant)] ? [self.dataSource widthForColumnsIsConstant] : NO;
+    
+    if (hasConstantRowHeight) 
+    {
+        defaultRowHeight = [self.dataSource respondsToSelector:@selector(gridView:heightForRow:)] ? [self.dataSource gridView:self heightForRow:0] : DTGridViewInvalid;
+    };
+    if (hasConstantColumnWidth) 
+    {
+        defaultRowHeight = [self.dataSource respondsToSelector:@selector(gridView:widthForCellAtRow:column:)] ? [self.dataSource gridView:self widthForCellAtRow:0 column:0] : DTGridViewInvalid;
+    }
+    
+    //
     cellOffset.x = [self findSpacingBetweenColumns];
     cellOffset.y = [self findSpacingBetweenRows];
     
