@@ -43,7 +43,7 @@
 
 - (void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event {
 	self.highlighted = YES;
-	[super touchesEnded:touches withEvent:event];
+	[super touchesBegan:touches withEvent:event];
 }
 
 - (void)touchesCancelled:(NSSet *)touches withEvent:(UIEvent *)event {
