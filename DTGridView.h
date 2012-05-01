@@ -61,6 +61,14 @@ struct DTOutset {
 	CGFloat right;
 };
 
+struct DTRect {
+    NSInteger left;
+    NSInteger top;
+    NSInteger right;
+    NSInteger bottom;
+};
+typedef struct DTRect DTRect;
+
 @class DTGridView;
 
 @protocol DTGridViewDelegate <UIScrollViewDelegate>
@@ -101,6 +109,7 @@ struct DTOutset {
 - (NSInteger)spacingBetweenColumnsInGridView:(DTGridView *)gridView;
 - (BOOL)heightForRowsIsConstant;
 - (BOOL)widthForColumnsIsConstant;
+- (BOOL)columnsCountIsConstant;
 
 @end
 
@@ -145,6 +154,7 @@ struct DTOutset {
     
     BOOL hasConstantRowHeight;
     BOOL hasConstantColumnWidth;
+    BOOL hasConstantColumnCount;
     NSInteger defaultRowHeight;
     NSInteger defaultColumnWidth;
 }
@@ -235,6 +245,13 @@ struct DTOutset {
  @abstact Internally called to load cells in sight. And unload cells out of view
 */
 - (void)loadCells;
+
+/*
+ @abstract Internally called to determine range of visible cells. Can be called only for constant row heights and column widths
+*/
+DTRect DTRectMake( NSInteger left, NSInteger top, NSInteger right, NSInteger bottom );
+
+- (DTRect)getVisibleCellsRect;
 
 
 @end
