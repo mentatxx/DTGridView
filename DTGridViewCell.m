@@ -18,8 +18,9 @@
 
 @implementation DTGridViewCell
 
-@synthesize xPosition, yPosition, identifier, delegate, selected;
+@synthesize xPosition, yPosition, identifier, selected;
 @synthesize highlighted;
+@synthesize delegate;
 
 @dynamic frame;
 
