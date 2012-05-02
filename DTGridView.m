@@ -396,7 +396,7 @@ NSInteger intSort(id info1, id info2, void *context) {
     };
     if (hasConstantColumnWidth) 
     {
-        defaultRowHeight = [self.dataSource respondsToSelector:@selector(gridView:widthForCellAtRow:column:)] ? [self.dataSource gridView:self widthForCellAtRow:0 column:0] : DTGridViewInvalid;
+        defaultColumnWidth = [self.dataSource respondsToSelector:@selector(gridView:widthForCellAtRow:column:)] ? [self.dataSource gridView:self widthForCellAtRow:0 column:0] : DTGridViewInvalid;
     }
     
     //
