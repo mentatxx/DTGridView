@@ -122,22 +122,13 @@ typedef struct DTRect DTRect;
 */
 @interface DTGridView : UIScrollView <UIScrollViewDelegate, DTGridViewCellDelegate> {
 	
-	NSObject<DTGridViewDataSource> *__unsafe_unretained dataSource;
-	
 	CGPoint cellOffset;
 	
 	UIEdgeInsets outset;
 	
-	NSMutableArray *gridCells;
-	
+	NSMutableArray *gridCellsInfo;
 	NSMutableArray *freeCells;
-	NSMutableArray *cellInfoForCellsOnScreen;
-	
-	NSMutableArray *gridRows;
-	NSMutableArray *rowHeights;
-	NSMutableArray *rowPositions;
-	
-	NSMutableArray *cellsOnScreen;
+    
 	
 	CGPoint oldContentOffset;
 	BOOL hasResized;
@@ -163,18 +154,18 @@ typedef struct DTRect DTRect;
  @abstract The object that acts as the data source of the receiving grid view.
  @discussion The data source must adopt the DTGridViewDataSource protocol. The data source is not retained.
 */
-@property (nonatomic, unsafe_unretained) IBOutlet NSObject<DTGridViewDataSource> *dataSource;
+@property (nonatomic, retain) IBOutlet NSObject<DTGridViewDataSource> *dataSource;
 
 /*!
  @abstract The object that acts as the delegate of the receiving grid view.
  @discussion The delegate must adopt the DTGridViewDelegate protocol. The delegate is not retained.
 */
-@property (nonatomic, unsafe_unretained) IBOutlet id<DTGridViewDelegate> delegate;
+@property (nonatomic, assign) IBOutlet id<DTGridViewDelegate> delegate;
 /*!
  @abstract The object that acts as the delegate of the receiving grid view.
  @deprecated This property is depricated and you should now use the standard delegate property.
  */
-@property (nonatomic, unsafe_unretained) IBOutlet id<DTGridViewDelegate> gridDelegate;
+@property (nonatomic, assign) IBOutlet id<DTGridViewDelegate> gridDelegate;
 
 /*!
  @abstract The offset for each cell with respect to the cells above and to the right.
@@ -182,7 +173,6 @@ typedef struct DTRect DTRect;
 */
 @property (assign) CGPoint cellOffset;
 @property (assign) UIEdgeInsets outset;
-@property (nonatomic, strong) NSMutableArray *gridCells;
 @property (nonatomic) NSInteger numberOfRows;
 
 #pragma mark -
@@ -251,7 +241,9 @@ typedef struct DTRect DTRect;
 */
 DTRect DTRectMake( NSInteger left, NSInteger top, NSInteger right, NSInteger bottom );
 
+- (CGRect)visibleRect;
 - (DTRect)getVisibleCellsRect;
+- (BOOL)isOutOfView: (DTGridViewCell*)v Rect:(CGRect)visibleRect;
 
 
 @end

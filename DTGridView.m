@@ -13,15 +13,15 @@ NSInteger const DTGridViewInvalid = -1;
 
 
 @interface DTGridViewCellInfo : NSObject <DTGridViewCellInfoProtocol> {
+    // x,y positions of cell
 	NSUInteger xPosition, yPosition;
+    // view bounds
 	CGRect frame;
-	CGFloat x, y, width, height;
 }
-@property (nonatomic, assign) CGFloat x, y, width, height;
 @end
 
 @implementation DTGridViewCellInfo
-@synthesize xPosition, yPosition, x, y, width, height, frame;
+@synthesize xPosition, yPosition, frame;
 - (NSString *)description {
 	return [NSString stringWithFormat:@"DTGridViewCellInfo: frame=(%i %i; %i %i) x=%i, y=%i", (NSInteger)self.frame.origin.x, (NSInteger)self.frame.origin.y, (NSInteger)self.frame.size.width, (NSInteger)self.frame.size.height, self.xPosition, self.yPosition];
 }
@@ -49,18 +49,15 @@ NSInteger const DTGridViewInvalid = -1;
 @implementation DTGridView
 
 @dynamic delegate;
-@synthesize dataSource, gridCells, numberOfRows, cellOffset, outset;
+@synthesize dataSource, numberOfRows, cellOffset, outset;
 @synthesize decelerationTimer, draggingTimer;
 
 - (void)dealloc {
 	super.delegate = nil;
 	self.dataSource = nil;
-	cellsOnScreen = nil;
-	gridRows = nil;
-	rowPositions = nil;
-	rowHeights = nil;
+    
 	freeCells = nil;
-	cellInfoForCellsOnScreen = nil;
+    gridCellsInfo = nil;
 }
 
 - (void)setGridDelegate:(id <DTGridViewDelegate>)aDelegate {
@@ -111,14 +108,8 @@ NSInteger intSort(id info1, id info2, void *context) {
     defaultColumnWidth = DTGridViewInvalid;
     defaultRowHeight = DTGridViewInvalid;
 	
-	gridRows = [[NSMutableArray alloc] init];
-	rowPositions = [[NSMutableArray alloc] init];
-	rowHeights = [[NSMutableArray alloc] init];
-	cellsOnScreen = [[NSMutableArray alloc] init];
-	
+	gridCellsInfo = [[NSMutableArray alloc] init];
 	freeCells = [[NSMutableArray alloc] init];
-	
-	cellInfoForCellsOnScreen = [[NSMutableArray alloc] init];
 }
 
 - (void)setFrame:(CGRect)aFrame {
@@ -146,11 +137,8 @@ NSInteger intSort(id info1, id info2, void *context) {
 - (void)drawRect:(CGRect)rect {
 	
 	oldContentOffset = 	CGPointMake(0.0f, 0.0f);
-		
-	//hasLoadedData = NO;
-	
-	//if (!hasLoadedData)
-	
+
+    // is it really needed here ?
 	[self loadData];
 	
     // fill subViews
@@ -169,31 +157,57 @@ NSInteger intSort(id info1, id info2, void *context) {
     //
     if (hasConstantColumnWidth && hasConstantRowHeight) 
     {
-        // new style - add only visible cells
-        DTRect visibleRect = [self getVisibleCellsRect];
-        for (NSInteger y = visibleRect.top; y <= visibleRect.bottom; y++)
+        // new style - add by rect
+        DTRect vRect = [self getVisibleCellsRect];
+        // check and visible cells
+        for (NSInteger y = vRect.top; y <= vRect.bottom; y++)
         {
             if ( (y>=0)&&(y<numberOfRows) ) {
-                for (NSInteger x = visibleRect.left; x<= visibleRect.right; x++) 
+                for (NSInteger x = vRect.left; x<= vRect.right; x++) 
                 {
-                    if ( (x>=0) && (x<[self findNumberOfColumnsForRow:y]) ) {
-                        // check if hasnt this cell
-                        if (![self cellForRow:y column:x]) {
-                            // then add cell
-                            // TODO
-                        }
+                    // check if hasnt this cell, then add cell
+                    if ( (x>=0) && (x<[self findNumberOfColumnsForRow:y]) && ![self cellForRow:y column:x]) {
+                        DTGridViewCell* newCell = [[self dataSource] gridView:self viewForRow:y column:x];
+                        // TODO (important) set geo for cell
+                        [self insertSubview:newCell atIndex:0];
                     }
                 }
             }
         }
-    } else
-    {
-        // old-style - add all cells at once
+        // put invisible cells to freeCells pool
         for (UIView *v in self.subviews)
             if ([v isKindOfClass:[DTGridViewCell class]])
-                [v removeFromSuperview];
-	
-        [self initialiseViews];
+            {
+                int x = [(DTGridViewCell*)v xPosition];
+                int y = [(DTGridViewCell*)v yPosition];
+                if ( (x<vRect.left) || (x>vRect.right) || (y<vRect.top) || (y>vRect.bottom) ) {
+                    // add to free cells pool
+                    [freeCells addObject:v];
+                    // remove from superview
+                    [v removeFromSuperview];
+                }
+            }
+        
+    } else
+    { 
+        // old-style - see in cells info
+        CGRect visibleRect = [self visibleRect];
+        // put invisible cells to freeCells pool
+        for (UIView *v in self.subviews)
+            if ([v isKindOfClass:[DTGridViewCell class]])
+            {
+                if ([self isOutOfView:(DTGridViewCell*)v Rect:visibleRect ])
+                {
+                    // add to free cells pool
+                    [freeCells addObject:v];
+                    // remove from superview
+                    [v removeFromSuperview];
+                }
+            };
+        // add visible cells
+        DTRect updateRect = [self getVisibleCellsRect];
+	    // TODO writeit
+        
     };
 }
 
@@ -230,121 +244,11 @@ NSInteger intSort(id info1, id info2, void *context) {
 
 #pragma mark Adding and Removing Cells
 
-- (void)addCellWithInfo:(NSObject<DTGridViewCellInfoProtocol> *)info {
-	
-	if (![info isMemberOfClass:[DTGridViewCellInfo class]]) return;
-	
-	NSUInteger idx = [cellInfoForCellsOnScreen indexOfObjectPassingTest:^BOOL(DTGridViewCellInfo *i, NSUInteger idx, BOOL *stop) {
-		return info.xPosition == i.xPosition && info.yPosition == i.yPosition;
-  	}];
-  	if(idx == NSNotFound)
-    		[cellInfoForCellsOnScreen addObject:info];
-  	else
-    		[cellInfoForCellsOnScreen replaceObjectAtIndex:idx withObject:info];
-	
-	[cellInfoForCellsOnScreen sortUsingFunction:intSort context:NULL];
-	
-	DTGridViewCell *cell = [self findViewForRow:info.yPosition column:info.xPosition];
-	[cell setNeedsDisplay];
-	cell.xPosition = info.xPosition;
-	cell.yPosition = info.yPosition;
-	cell.delegate = self;
-	cell.frame = info.frame;
-	
-	if (cell.xPosition == columnIndexOfSelectedCell && cell.yPosition == rowIndexOfSelectedCell)
-		cell.selected = YES;
-	else
-		cell.selected = NO;
-	
-	[[gridCells objectAtIndex:info.yPosition] replaceObjectAtIndex:info.xPosition withObject:cell];
-	
-	[self insertSubview:cell atIndex:0];
-	
-	// remove any existing view at this frame	
-	for (UIView *v in self.subviews) {
-		if ([v isKindOfClass:[DTGridViewCell class]] &&
-			v.frame.origin.x == cell.frame.origin.x &&
-			v.frame.origin.y == cell.frame.origin.y &&
-			v != cell) {
-			
-			[v removeFromSuperview];
-			break;
-		}
-	}
-	
-
-}
-
-- (void)removeCellWithInfo:(DTGridViewCellInfo *)info {
-	
-	
-	
-	if (info.yPosition >= [gridCells count]) return;
-	
-	NSMutableArray *row = [gridCells objectAtIndex:info.yPosition];
-	
-	if (info.xPosition >= [row count]) return;
-	
-	DTGridViewCell *cell = [row objectAtIndex:info.xPosition];
-	
-	if (![cell isKindOfClass:[DTGridViewCell class]]) return;
-	
-	
-	[cell removeFromSuperview];
-	
-	[row replaceObjectAtIndex:info.xPosition withObject:info];
-	
-	[cellInfoForCellsOnScreen removeObject:info];
-	
-	// TODO: Should this be set?
-	//cell.frame = CGRectZero;
-	
-	[freeCells addObject:cell];
-		
-}
-
 - (CGRect)visibleRect {
     CGRect visibleRect;
     visibleRect.origin = self.contentOffset;
     visibleRect.size = self.bounds.size;
 	return visibleRect;
-}
-
-- (BOOL)rowOfCellInfoShouldBeOnShow:(NSObject<DTGridViewCellInfoProtocol> *)info {
-	
-	CGRect visibleRect = [self visibleRect];
-	
-	CGRect infoFrame = info.frame;
-    
-    CGFloat infoBottom = infoFrame.origin.y + infoFrame.size.height;
-    CGFloat infoTop = infoFrame.origin.y;
-    
-    CGFloat visibleBottom = visibleRect.origin.y + visibleRect.size.height;
-    CGFloat visibleTop = visibleRect.origin.y;
-    
-    return (infoBottom >= visibleTop &&
-            infoTop <= visibleBottom);
-}
-
-- (BOOL)cellInfoShouldBeOnShow:(NSObject<DTGridViewCellInfoProtocol> *)info {
-	
-	if (!info || ![info isMemberOfClass:[DTGridViewCellInfo class]]) return NO;
-	
-    CGRect visibleRect = [self visibleRect];
-    
-    CGFloat infoRight = info.frame.origin.x + info.frame.size.width;
-    CGFloat infoLeft = info.frame.origin.x;
-    
-	CGFloat visibleRight = visibleRect.origin.x + visibleRect.size.width;
-    CGFloat visibleLeft = visibleRect.origin.x;
-    
-    if (infoRight >= visibleLeft &&
-		infoLeft <=  visibleRight &&
-		[self rowOfCellInfoShouldBeOnShow:info]) return YES;
-	
-	//NSLog(@"%@ NO: %@", NSStringFromSelector(_cmd), NSStringFromCGRect(info.frame));
-	
-	return NO;
 }
 
 
