@@ -67,4 +67,9 @@
 	return (DTGridView *)r;
 }
 
+-(void)dealloc
+{
+    identifier = nil;
+}
+
 @end

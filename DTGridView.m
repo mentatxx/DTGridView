@@ -117,21 +117,21 @@ NSInteger intSort(id info1, id info2, void *context) {
 }
 
 - (void)reloadData {
+    [self removeAllCells];
 	[self loadData];
-	[self setNeedsDisplay];
+    [self loadCells];
 	[self setNeedsLayout];
+	[self setNeedsDisplay];
+}
+
+-(void) removeAllCells {
+    // completely remove cells, put them to freeCells pool
+    for (UIView *v in self.subviews)
+        if ([v isKindOfClass:[DTGridViewCell class]]) [self removeCellToPool:(DTGridViewCell *)v];
+    
 }
 
 - (void)drawRect:(CGRect)rect {
-//	
-//	oldContentOffset = 	CGPointMake(0.0f, 0.0f);
-//
-//    // is it really needed here ?
-//	[self loadData];
-//	
-//    // fill subViews
-//    [self loadCells];
-	
 	[self didLoad];
 }
 
@@ -180,12 +180,7 @@ NSInteger intSort(id info1, id info2, void *context) {
             {
                 int x = [(DTGridViewCell*)v xPosition];
                 int y = [(DTGridViewCell*)v yPosition];
-                if ( (x<vRect.left) || (x>vRect.right) || (y<vRect.top) || (y>vRect.bottom) ) {
-                    // add to free cells pool
-                    [freeCells addObject:v];
-                    // remove from superview
-                    [v removeFromSuperview];
-                }
+                if ( (x<vRect.left) || (x>vRect.right) || (y<vRect.top) || (y>vRect.bottom) ) [self removeCellToPool:(DTGridViewCell*)v];
             }
         
     } else
@@ -196,13 +191,7 @@ NSInteger intSort(id info1, id info2, void *context) {
         for (UIView *v in self.subviews)
             if ([v isKindOfClass:[DTGridViewCell class]])
             {
-                if ([self isOutOfView:(DTGridViewCell*)v Rect:visibleRect ])
-                {
-                    // add to free cells pool
-                    [freeCells addObject:v];
-                    // remove from superview
-                    [v removeFromSuperview];
-                }
+                if ([self isOutOfView:(DTGridViewCell*)v Rect:visibleRect ]) [self removeCellToPool:(DTGridViewCell*)v];
             };
         
     };
@@ -414,18 +403,16 @@ NSInteger intSort(id info1, id info2, void *context) {
         self.contentSize = CGSizeMake(maxWidth, maxHeight);
         
         gridCellsInfo = cellInfoArrayRows;
-        
-        // completely remove cells, put them to freeCells pool
-        for (UIView *v in self.subviews)
-            if ([v isKindOfClass:[DTGridViewCell class]])
-            {
-                    // add to free cells pool
-                    [freeCells addObject:v];
-                    // remove from superview
-                    [v removeFromSuperview];
-            };
     }
     
+}
+
+-(void)removeCellToPool:(DTGridViewCell *)cell
+{
+    // add to free cells pool
+    [freeCells addObject:cell];
+    // remove from superview
+    [cell removeFromSuperview];
 }
 
 
@@ -433,15 +420,16 @@ NSInteger intSort(id info1, id info2, void *context) {
 
 - (DTGridViewCell *)dequeueReusableCellWithIdentifier:(NSString *)identifier {
 	
+    DTGridViewCell* result = nil;
 	for (DTGridViewCell *c in freeCells) {
 		if ([c.identifier isEqualToString:identifier]) {
-			[freeCells removeObject:c];
 			[c prepareForReuse];
-			return c;
+            result = c;
+            break;
 		}
 	}
-	
-	return nil;
+    if (result) [freeCells removeObject:result];
+	return result;
 }
 
 - (DTGridViewCell *)cellForRow:(NSUInteger)rowIndex column:(NSUInteger)columnIndex {

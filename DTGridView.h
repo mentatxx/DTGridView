@@ -231,6 +231,13 @@ typedef struct DTRect DTRect;
 - (void)loadCells;
 
 /*
+ @abstract Remove cell from superview to pool
+ */
+- (void)removeCellToPool: (DTGridViewCell*) cell;
+
+- (void)removeAllCells;
+
+/*
  @abstract Internally called to determine range of visible cells. Can be called only for constant row heights and column widths
 */
 DTRect DTRectMake( NSInteger left, NSInteger top, NSInteger right, NSInteger bottom );
