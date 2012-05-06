@@ -42,7 +42,7 @@ NSInteger intSort(id info1, id info2, void *context);
 
 @implementation DTGridView
 
-@dynamic delegate;
+@synthesize delegate;
 @synthesize dataSource, numberOfRows, cellOffset, outset;
 @synthesize decelerationTimer, draggingTimer;
 
@@ -52,13 +52,6 @@ NSInteger intSort(id info1, id info2, void *context);
     
 	freeCells = nil;
     gridCellsInfo = nil;
-}
-
-- (void)setGridDelegate:(id <DTGridViewDelegate>)aDelegate {
-	self.delegate = aDelegate;
-}
-- (id <DTGridViewDelegate>)gridDelegate {
-	return self.delegate;
 }
 
 NSInteger intSort(id info1, id info2, void *context) {
@@ -94,6 +87,7 @@ NSInteger intSort(id info1, id info2, void *context) {
 }
 
 - (void)dctInternal_setupInternals {
+    [super setDelegate: self];
 	numberOfRows = DTGridViewInvalid;
 	columnIndexOfSelectedCell = DTGridViewInvalid;
 	rowIndexOfSelectedCell = DTGridViewInvalid;
@@ -129,14 +123,14 @@ NSInteger intSort(id info1, id info2, void *context) {
 }
 
 - (void)drawRect:(CGRect)rect {
-	
-	oldContentOffset = 	CGPointMake(0.0f, 0.0f);
-
-    // is it really needed here ?
-	[self loadData];
-	
-    // fill subViews
-    [self loadCells];
+//	
+//	oldContentOffset = 	CGPointMake(0.0f, 0.0f);
+//
+//    // is it really needed here ?
+//	[self loadData];
+//	
+//    // fill subViews
+//    [self loadCells];
 	
 	[self didLoad];
 }
@@ -148,32 +142,38 @@ NSInteger intSort(id info1, id info2, void *context) {
 
 - (void)loadCells
 {
-    //
-    if (hasConstantColumnWidth && hasConstantRowHeight) 
+    // add visible cells
+    // new style - add by rect
+    DTRect vRect = [self getVisibleCellsRect];
+    // get spacings
+    CGFloat spacingRows = [self findSpacingBetweenRows];
+    CGFloat spacingColumns = [self findSpacingBetweenColumns];
+    // check and visible cells
+    for (NSInteger y = vRect.top; y <= vRect.bottom; y++)
     {
-        // new style - add by rect
-        DTRect vRect = [self getVisibleCellsRect];
-        // get spacings
-        CGFloat spacingRows = [self findSpacingBetweenRows];
-        CGFloat spacingColumns = [self findSpacingBetweenColumns];
-        // check and visible cells
-        for (NSInteger y = vRect.top; y <= vRect.bottom; y++)
-        {
-            if ( (y>=0)&&(y<numberOfRows) ) {
-                for (NSInteger x = vRect.left; x<= vRect.right; x++) 
-                {
-                    // check if hasnt this cell, then add cell
-                    if ( (x>=0) && (x<[self findNumberOfColumnsForRow:y]) && ![self cellForRow:y column:x]) {
-                        DTGridViewCell* newCell = [[self dataSource] gridView:self viewForRow:y column:x];
-                        // set geo for cell
-                        CGRect bounds = CGRectMake(x*(defaultColumnWidth+spacingColumns), y*(defaultRowHeight+spacingRows), defaultColumnWidth, defaultRowHeight);
-                        [newCell setBounds:bounds];
-                        // add as subview
-                        [self insertSubview:newCell atIndex:0];
-                    }
+        NSInteger columnsInRow = [self findNumberOfColumnsForRow:y];
+        if ( (y>=0)&&(y<numberOfRows) ) {
+            for (NSInteger x = vRect.left; (x<= vRect.right) && (x<columnsInRow); x++) 
+            {
+                // check if hasnt this cell, then add cell
+                if ( (x>=0) && (x<[self findNumberOfColumnsForRow:y]) && ![self cellForRow:y column:x]) {
+                    DTGridViewCell* newCell = [[self dataSource] gridView:self viewForRow:y column:x];
+                    // set geo for cell
+                    CGRect bounds = CGRectMake(x*(defaultColumnWidth+spacingColumns), y*(defaultRowHeight+spacingRows), defaultColumnWidth, defaultRowHeight);
+                    [newCell setFrame:bounds];
+                    newCell.xPosition = x;
+                    newCell.yPosition = y;
+                    newCell.frame = bounds;
+                    // add as subview
+                    [self insertSubview:newCell atIndex:0];
                 }
             }
         }
+    }
+    //
+    if (hasConstantColumnWidth && hasConstantRowHeight) 
+    {
+
         // put invisible cells to freeCells pool
         for (UIView *v in self.subviews)
             if ([v isKindOfClass:[DTGridViewCell class]])
@@ -204,9 +204,6 @@ NSInteger intSort(id info1, id info2, void *context) {
                     [v removeFromSuperview];
                 }
             };
-        // add visible cells
-        DTRect updateRect = [self getVisibleCellsRect];
-	    // TODO writeit
         
     };
 }
@@ -325,7 +322,7 @@ NSInteger intSort(id info1, id info2, void *context) {
     };
     if (hasConstantColumnWidth) 
     {
-        defaultRowHeight = [self.dataSource respondsToSelector:@selector(gridView:widthForCellAtRow:column:)] ? [self.dataSource gridView:self widthForCellAtRow:0 column:0] : DTGridViewInvalid;
+        defaultColumnWidth = [self.dataSource respondsToSelector:@selector(gridView:widthForCellAtRow:column:)] ? [self.dataSource gridView:self widthForCellAtRow:0 column:0] : DTGridViewInvalid;
     }
     
     //
@@ -683,6 +680,98 @@ DTRect DTRectMake( NSInteger left, NSInteger top, NSInteger right, NSInteger bot
         return DTRectMake(rLeft, rTop, rRight, rBottom);
     }
 }
+
+- (BOOL)isOutOfView: (DTGridViewCell*)v Rect:(CGRect)visibleRect
+{
+    return (v.frame.origin.x > visibleRect.origin.x + visibleRect.size.width) || (v.frame.origin.x + v.frame.size.width < visibleRect.origin.x ) ||
+    (v.frame.origin.y > visibleRect.origin.y + visibleRect.size.height) || (v.frame.origin.y + v.frame.size.height < visibleRect.origin.y );
+}
+
+/* UIScrollView delegate override */
+
+// any offset change
+- (void)scrollViewDidScroll:(UIScrollView *)scrollView
+{
+    [self loadCells];
+    if ([self.delegate respondsToSelector:@selector(scrollViewDidScroll:)]) {[self.delegate scrollViewDidScroll:scrollView]; };
+}
+
+// any zoom scale changes
+- (void)scrollViewDidZoom:(UIScrollView *)scrollView __OSX_AVAILABLE_STARTING(__MAC_NA,__IPHONE_3_2)
+{
+    if ([self.delegate respondsToSelector:@selector(scrollViewDidZoom:)]) {[self.delegate scrollViewDidZoom:scrollView]; };
+   
+}
+
+// called on start of dragging (may require some time and or distance to move)
+- (void)scrollViewWillBeginDragging:(UIScrollView *)scrollView
+{
+    if ([self.delegate respondsToSelector:@selector(scrollViewWillBeginDragging:)]) {[self.delegate scrollViewWillBeginDragging:scrollView]; };
+}
+
+// called on finger up if the user dragged. velocity is in points/second. targetContentOffset may be changed to adjust where the scroll view comes to rest. not called when pagingEnabled is YES
+- (void)scrollViewWillEndDragging:(UIScrollView *)scrollView withVelocity:(CGPoint)velocity targetContentOffset:(inout CGPoint *)targetContentOffset __OSX_AVAILABLE_STARTING(__MAC_NA,__IPHONE_5_0)
+{
+    if ([self.delegate respondsToSelector:@selector(scrollViewWillEndDragging:withVelocity:targetContentOffset:)]) 
+    {
+        [self.delegate scrollViewWillEndDragging:scrollView withVelocity:velocity targetContentOffset:targetContentOffset]; 
+    };
+}
+
+// called on finger up if the user dragged. decelerate is true if it will continue moving afterwards
+- (void)scrollViewDidEndDragging:(UIScrollView *)scrollView willDecelerate:(BOOL)decelerate
+{
+    if ([self.delegate respondsToSelector:@selector(scrollViewDidEndDragging:willDecelerate:)]) {[self.delegate scrollViewDidEndDragging:scrollView willDecelerate:decelerate]; };
+}
+
+// called on finger up as we are moving
+- (void)scrollViewWillBeginDecelerating:(UIScrollView *)scrollView
+{
+    if ([self.delegate respondsToSelector:@selector(scrollViewWillBeginDecelerating:)]) {[self.delegate scrollViewWillBeginDecelerating:scrollView]; };
+}
+
+// called when scroll view grinds to a halt
+- (void)scrollViewDidEndDecelerating:(UIScrollView *)scrollView
+{
+    if ([self.delegate respondsToSelector:@selector(scrollViewDidEndDecelerating:)]) {[self.delegate scrollViewDidEndDecelerating:scrollView]; };
+}
+
+// called when setContentOffset/scrollRectVisible:animated: finishes. not called if not animating
+- (void)scrollViewDidEndScrollingAnimation:(UIScrollView *)scrollView
+{
+    if ([self.delegate respondsToSelector:@selector(scrollViewDidEndScrollingAnimation:)]) {[self.delegate scrollViewDidEndScrollingAnimation:scrollView]; };
+}
+
+// return a view that will be scaled. if delegate returns nil, nothing happens
+- (UIView *)viewForZoomingInScrollView:(UIScrollView *)scrollView
+{
+    if ([self.delegate respondsToSelector:@selector(viewForZoomingInScrollView:)]) {return [self.delegate viewForZoomingInScrollView:scrollView]; } else { return nil; };
+}
+
+// called before the scroll view begins zooming its content
+- (void)scrollViewWillBeginZooming:(UIScrollView *)scrollView withView:(UIView *)view __OSX_AVAILABLE_STARTING(__MAC_NA,__IPHONE_3_2)
+{
+    if ([self.delegate respondsToSelector:@selector(scrollViewWillBeginZooming:withView:)]) {[self.delegate scrollViewWillBeginZooming:scrollView withView:view]; };
+}
+
+// scale between minimum and maximum. called after any 'bounce' animations
+- (void)scrollViewDidEndZooming:(UIScrollView *)scrollView withView:(UIView *)view atScale:(float)scale
+{
+    if ([self.delegate respondsToSelector:@selector(scrollViewDidEndZooming:withView:atScale:)]) {[self.delegate scrollViewDidEndZooming:scrollView withView:view atScale:scale]; };
+}
+
+// return a yes if you want to scroll to the top. if not defined, assumes YES
+- (BOOL)scrollViewShouldScrollToTop:(UIScrollView *)scrollView
+{
+    if ([self.delegate respondsToSelector:@selector(scrollViewShouldScrollToTop:)]) {return [self.delegate scrollViewShouldScrollToTop:scrollView]; } else { return YES; };
+}
+
+// called when scrolling animation finished. may be called immediately if already at top
+- (void)scrollViewDidScrollToTop:(UIScrollView *)scrollView
+{
+    if ([self.delegate respondsToSelector:@selector(scrollViewDidScrollToTop:)]) {[self.delegate scrollViewDidScrollToTop:scrollView]; };
+}
+
 
 @end
 
