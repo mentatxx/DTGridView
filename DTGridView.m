@@ -30,16 +30,10 @@ NSInteger const DTGridViewInvalid = -1;
 @interface DTGridView ()
 - (void)dctInternal_setupInternals;
 - (void)loadData;
-- (void)checkViews;
-- (void)initialiseViews;
 - (void)fireEdgeScroll;
-- (void)checkNewRowStartingWithCellInfo:(NSObject<DTGridViewCellInfoProtocol> *)info goingUp:(BOOL)goingUp;
-- (NSObject<DTGridViewCellInfoProtocol> *)cellInfoForRow:(NSUInteger)row column:(NSUInteger)col;
-- (void)checkRow:(NSInteger)row column:(NSInteger)col goingLeft:(BOOL)goingLeft;
-
-
 - (void)decelerationTimer:(NSTimer *)timer;
 - (void)draggingTimer:(NSTimer *)timer;
+NSInteger intSort(id info1, id info2, void *context);
 
 @property (nonatomic, strong) NSTimer *decelerationTimer, *draggingTimer;
 @end
@@ -159,6 +153,9 @@ NSInteger intSort(id info1, id info2, void *context) {
     {
         // new style - add by rect
         DTRect vRect = [self getVisibleCellsRect];
+        // get spacings
+        CGFloat spacingRows = [self findSpacingBetweenRows];
+        CGFloat spacingColumns = [self findSpacingBetweenColumns];
         // check and visible cells
         for (NSInteger y = vRect.top; y <= vRect.bottom; y++)
         {
@@ -168,7 +165,10 @@ NSInteger intSort(id info1, id info2, void *context) {
                     // check if hasnt this cell, then add cell
                     if ( (x>=0) && (x<[self findNumberOfColumnsForRow:y]) && ![self cellForRow:y column:x]) {
                         DTGridViewCell* newCell = [[self dataSource] gridView:self viewForRow:y column:x];
-                        // TODO (important) set geo for cell
+                        // set geo for cell
+                        CGRect bounds = CGRectMake(x*(defaultColumnWidth+spacingColumns), y*(defaultRowHeight+spacingRows), defaultColumnWidth, defaultRowHeight);
+                        [newCell setBounds:bounds];
+                        // add as subview
                         [self insertSubview:newCell atIndex:0];
                     }
                 }
@@ -216,8 +216,8 @@ NSInteger intSort(id info1, id info2, void *context) {
 - (void)didEndMoving {}
 
 - (void)layoutSubviews {
+	[self loadCells];
 	[super layoutSubviews];
-	[self checkViews];
 	[self fireEdgeScroll];
 	
 	if (!self.draggingTimer && !self.decelerationTimer && self.dragging)
@@ -348,12 +348,9 @@ NSInteger intSort(id info1, id info2, void *context) {
             maxWidth = (defaultColumnWidth + cellOffset.x)*[self findNumberOfColumnsForRow:0];
         }
         self.contentSize = CGSizeMake(maxWidth, maxHeight);
-        self.gridCells = nil;        
+        gridCellsInfo = nil;
     } else 
     {
-        [gridRows removeAllObjects];
-        [rowHeights removeAllObjects];
-        [rowPositions removeAllObjects];
         
         NSMutableArray *cellInfoArrayRows = [[NSMutableArray alloc] init];
         
@@ -367,32 +364,28 @@ NSInteger intSort(id info1, id info2, void *context) {
             
             NSMutableArray *cellInfoArrayCols = [[NSMutableArray alloc] init];
             
+            CGFloat height = [self findHeightForRow:i];
+            
             for (NSInteger j = 0; j < numberOfCols; j++) {
-                
-                
                 DTGridViewCellInfo *info = [[DTGridViewCellInfo alloc] init];
                 
                 info.xPosition = j;
                 info.yPosition = i;
                 
-                
-                CGFloat height = [self findHeightForRow:i];
-                CGFloat width = [self findWidthForRow:i column:j];
-                
-                //info.frame.size.height = [dataSource gridView:self heightForRow:i];
-                //info.frame.size.width = [dataSource gridView:self widthForCellAtRow:i column:j];
                 CGFloat y;
                 CGFloat x;
                 
+                CGFloat width = [self findWidthForRow:i column:j];
+                
                 if (i == 0) {
                     y = 0.0f;
-                    //info.frame.origin.y = 0.0;
                 } else {
                     DTGridViewCellInfo *previousCellRow = [[cellInfoArrayRows objectAtIndex:i-1] objectAtIndex:0];
                     y = previousCellRow.frame.origin.y + previousCellRow.frame.size.height;
                     
                     if (cellOffset.y != 0)
                         y += cellOffset.y;
+                    previousCellRow = nil;
                 }
                 
                 if (j == 0) {
@@ -402,6 +395,7 @@ NSInteger intSort(id info1, id info2, void *context) {
                     x = previousCellRow.frame.origin.x + previousCellRow.frame.size.width;
                     if (cellOffset.x != 0)
                         x += cellOffset.x;
+                    previousCellRow = nil;
                 }
                 
                 if (maxHeight < y + height)
@@ -422,212 +416,21 @@ NSInteger intSort(id info1, id info2, void *context) {
         
         self.contentSize = CGSizeMake(maxWidth, maxHeight);
         
-        self.gridCells = cellInfoArrayRows;
+        gridCellsInfo = cellInfoArrayRows;
         
-        if ([self.subviews count] > [self.gridCells count]) {
-            // the underlying data must have reduced, time to iterate
-            NSSet *gridCellsSet = [NSSet setWithArray:self.gridCells];
-            NSArray *subviewsCopy = [self.subviews copy];
-            
-            for (UIView *cell in subviewsCopy) {
-                if (
-                    [cell isKindOfClass:[DTGridViewCell class]] &&
-                    ![gridCellsSet member:cell]
-                    )
-                {
-                    [cell removeFromSuperview];
-                }
-            }
-            
-        }
+        // completely remove cells, put them to freeCells pool
+        for (UIView *v in self.subviews)
+            if ([v isKindOfClass:[DTGridViewCell class]])
+            {
+                    // add to free cells pool
+                    [freeCells addObject:v];
+                    // remove from superview
+                    [v removeFromSuperview];
+            };
     }
-}
-
-- (void)checkViews {
-		
-	if ([cellInfoForCellsOnScreen count] == 0) {
-		[self initialiseViews];
-		return;
-	}
-	
-	NSMutableDictionary *leftRightCells = [[NSMutableDictionary alloc] init];
-		
-	NSArray *orderedCells = [cellInfoForCellsOnScreen copy];
-	
-	BOOL isGoingUp = NO;
-	BOOL isGoingDown = NO;
-	BOOL isGoingLeft = NO;
-	BOOL isGoingRight = NO;
-	
-	if (self.contentOffset.y < oldContentOffset.y && self.contentOffset.y >= 0)
-		isGoingUp = YES;
-	else if (self.contentOffset.y > oldContentOffset.y && self.contentOffset.y + self.frame.size.height < self.contentSize.height)
-		isGoingDown = YES;
-	else if (hasResized)
-		isGoingUp = YES;
-	
-	if (self.contentOffset.x < oldContentOffset.x && self.contentOffset.x >= 0)
-		isGoingLeft = YES;
-	else if (self.contentOffset.x > oldContentOffset.x && self.contentOffset.x + self.frame.size.width < self.contentSize.width)
-		isGoingRight = YES;
-	else if (hasResized)
-		isGoingRight = YES;
     
-  //  NSLog(@"isGoingUp: %i, isGoingDown: %i, co.y: %f, old.y: %f", isGoingUp, isGoingDown, self.contentOffset.y, oldContentOffset.y);
-	
-	hasResized = NO;
-	oldContentOffset = self.contentOffset;
-	
-	for (DTGridViewCellInfo *info in orderedCells) {
-		
-		if (isGoingLeft) {
-			if (info.xPosition > 0 && info.frame.origin.x > self.contentOffset.x) {
-				if (![leftRightCells objectForKey:[NSString stringWithFormat:@"%i", info.yPosition]])
-					[leftRightCells setObject:info forKey:[NSString stringWithFormat:@"%i", info.yPosition]];
-				else if ([[leftRightCells objectForKey:[NSString stringWithFormat:@"%i", info.yPosition]] xPosition] > info.xPosition)
-					[leftRightCells setObject:info forKey:[NSString stringWithFormat:@"%i", info.yPosition]];
-			}
-		} else if (isGoingRight && (self.gridCells.count > info.yPosition)) {
-			if ([[self.gridCells objectAtIndex:info.yPosition] count] - 1 > info.xPosition && info.frame.origin.x + info.frame.size.width < self.contentOffset.x + self.frame.size.width) {
-				if (![leftRightCells objectForKey:[NSString stringWithFormat:@"%i", info.yPosition]])
-					[leftRightCells setObject:info forKey:[NSString stringWithFormat:@"%i", info.yPosition]];
-				else if ([[leftRightCells objectForKey:[NSString stringWithFormat:@"%i", info.yPosition]] xPosition] < info.xPosition)
-					[leftRightCells setObject:info forKey:[NSString stringWithFormat:@"%i", info.yPosition]];
-			}
-		}
-		
-		if (![self cellInfoShouldBeOnShow:info])
-			[self removeCellWithInfo:info];
-		
-	}
-	
-	if (isGoingLeft) {
-		for (NSString *yPos in [leftRightCells allKeys]) {			
-			DTGridViewCellInfo *info = [leftRightCells objectForKey:yPos];
-			[self checkRow:info.yPosition column:info.xPosition goingLeft:YES];
-		}
-		
-	} else if (isGoingRight) {
-		for (NSString *yPos in [leftRightCells allKeys]) {
-			DTGridViewCellInfo *info = [leftRightCells objectForKey:yPos];
-			[self checkRow:info.yPosition column:info.xPosition goingLeft:NO];
-		}
-	}
-		
-	if (isGoingUp)
-		[self checkNewRowStartingWithCellInfo:[orderedCells objectAtIndex:0] goingUp:YES];
-	else if (isGoingDown)
-		[self checkNewRowStartingWithCellInfo:[orderedCells lastObject] goingUp:NO];
-	
-	
 }
 
-- (void)initialiseViews {
-	
-	for (NSUInteger i = 0; i < [cellInfoForCellsOnScreen count]; i++) {
-		
-		DTGridViewCellInfo *info = [cellInfoForCellsOnScreen objectAtIndex:i];
-		
-		if (![self cellInfoShouldBeOnShow:info])
-			[self removeCellWithInfo:info];
-		
-	}
-	
-	for (NSUInteger i = 0; i < [gridCells count]; i++) {
-		
-		NSMutableArray *row = [gridCells objectAtIndex:i];
-		
-		for (NSUInteger j = 0; j < [row count]; j++) {	
-			
-			id object = [row objectAtIndex:j];
-			
-			if ([object isMemberOfClass:[DTGridViewCellInfo class]]) {
-				
-				DTGridViewCellInfo *info = (DTGridViewCellInfo *)object;
-				
-				if ([self cellInfoShouldBeOnShow:info])
-					[self addCellWithInfo:info];
-				
-			}
-		}
-	}
-}
-
-- (void)checkRow:(NSInteger)row column:(NSInteger)col goingLeft:(BOOL)goingLeft {
-	
-	NSObject<DTGridViewCellInfoProtocol> *info = [self cellInfoForRow:row column:col];
-	
-	if (!info) return;
-	
-	if ([self cellInfoShouldBeOnShow:info])
-		[self addCellWithInfo:info];
-		
-	if (goingLeft) {
-		if (info.frame.origin.x > self.contentOffset.x)
-			[self checkRow:row column:(col - 1) goingLeft:goingLeft];
-	} else {
-		if (info.frame.origin.x + info.frame.size.width < self.contentOffset.x + self.frame.size.width)
-			[self checkRow:row column:(col + 1) goingLeft:goingLeft];
-	}
-}
-
-- (NSObject<DTGridViewCellInfoProtocol> *)cellInfoForRow:(NSUInteger)row column:(NSUInteger)col {
-	
-	if ([self.gridCells count] <= row) return nil;
-	
-	NSArray *rowArray = [self.gridCells objectAtIndex:row];
-	
-	if ([rowArray count] <= col) return nil;
-	
-	return (NSObject<DTGridViewCellInfoProtocol> *)[rowArray objectAtIndex:col];
-}
-
-- (void)checkNewRowStartingWithCellInfo:(NSObject<DTGridViewCellInfoProtocol> *)info goingUp:(BOOL)goingUp {
-	
-    //NSLog(@"%@", info);
-    
-	if (!info) return;
-		
-	if (![self rowOfCellInfoShouldBeOnShow:info]) return;
-	
-	NSObject<DTGridViewCellInfoProtocol> *infoToCheck = info;
-	
-	NSInteger row = info.yPosition;
-	NSInteger total = [[self.gridCells objectAtIndex:row] count];
-	NSInteger goingRightPosition = info.xPosition;
-	NSInteger goingLeftPosition = info.xPosition;
-	BOOL goingLeft = NO;
-	
-	while (![self cellInfoShouldBeOnShow:infoToCheck]) {
-				
-		goingLeft = !goingLeft;
-				
-		if (goingLeft)
-			infoToCheck = [self cellInfoForRow:row column:--goingLeftPosition];
-		else
-			infoToCheck = [self cellInfoForRow:row column:++goingRightPosition];
-				
-		if (goingRightPosition > total)
-			return;
-	}
-	
-	if ([infoToCheck isEqual:info]) {
-		[self checkRow:infoToCheck.yPosition column:infoToCheck.xPosition goingLeft:YES];
-		[self checkRow:infoToCheck.yPosition column:infoToCheck.xPosition goingLeft:NO];
-	} else {
-		[self checkRow:infoToCheck.yPosition column:infoToCheck.xPosition goingLeft:goingLeft];
-	}
-
-	NSObject<DTGridViewCellInfoProtocol> *nextInfo = nil;
-	
-	if (goingUp)
-		nextInfo = [self cellInfoForRow:info.yPosition - 1 column:info.xPosition];
-	else
-		nextInfo = [self cellInfoForRow:info.yPosition + 1 column:info.xPosition];
-		
-	if (nextInfo)
-		[self checkNewRowStartingWithCellInfo:nextInfo goingUp:goingUp];
-}
 
 #pragma mark Public methods
 
@@ -661,7 +464,7 @@ NSInteger intSort(id info1, id info2, void *context) {
 	
 	CGFloat xPos = 0, yPos = 0;
 	
-	CGRect cellFrame = [[[self.gridCells objectAtIndex:rowIndex] objectAtIndex:columnIndex] frame];		
+	CGRect cellFrame = [[[gridCellsInfo objectAtIndex:rowIndex] objectAtIndex:columnIndex] frame];		
 	
 	// working out x co-ord
 	
@@ -751,7 +554,7 @@ NSInteger intSort(id info1, id info2, void *context) {
 	[self scrollRectToVisible:CGRectMake(xPos, yPos, self.frame.size.width, self.frame.size.height) animated:animated];
 	
 	if (!animated)
-		[self checkViews];
+		[self loadCells];
 	
 	if ([self.delegate respondsToSelector:@selector(gridView:didProgrammaticallyScrollToRow:column:)])
 		[self.delegate gridView:self didProgrammaticallyScrollToRow:rowIndex column:columnIndex];
@@ -833,16 +636,52 @@ DTRect DTRectMake( NSInteger left, NSInteger top, NSInteger right, NSInteger bot
 
 -(DTRect)getVisibleCellsRect
 {
-    if (!(hasConstantRowHeight && hasConstantColumnWidth)) {
-        @throw([[NSException alloc] initWithName:@"getVisibleCellRect - invalid call" reason:@"getVisibleCellsRect can be called only for constant sized  cells" userInfo:nil]);
-    };
-    CGRect visibleRect = [self visibleRect];
-    DTRect result = DTRectMake(0,0,0,0);
-    result.left = visibleRect.origin.x / (defaultColumnWidth+[self findSpacingBetweenColumns]);
-    result.top = visibleRect.origin.y / (defaultRowHeight+[self findSpacingBetweenRows]);
-    result.right = (visibleRect.origin.x + visibleRect.size.width) / (defaultColumnWidth+[self findSpacingBetweenColumns])+1;
-    result.bottom = (visibleRect.origin.y + visibleRect.size.height) / (defaultRowHeight+[self findSpacingBetweenRows])+1;
-    return result;
+    if (hasConstantRowHeight && hasConstantColumnWidth) {
+        CGRect visibleRect = [self visibleRect];
+        DTRect result = DTRectMake(0,0,0,0);
+        result.left = visibleRect.origin.x / (defaultColumnWidth+[self findSpacingBetweenColumns]);
+        result.top = visibleRect.origin.y / (defaultRowHeight+[self findSpacingBetweenRows]);
+        result.right = (visibleRect.origin.x + visibleRect.size.width) / (defaultColumnWidth+[self findSpacingBetweenColumns])+1;
+        result.bottom = (visibleRect.origin.y + visibleRect.size.height) / (defaultRowHeight+[self findSpacingBetweenRows])+1;
+        return result;
+    } else {
+        // TODO: use quicksearch
+        // get screen rect
+        CGRect visibleRect = [self visibleRect];
+        // find top
+        NSInteger rTop = [gridCellsInfo count]-1;
+        for (NSInteger i=0; i<[gridCellsInfo count]; i++) {
+            DTGridViewCellInfo* cell = [[gridCellsInfo objectAtIndex:i] objectAtIndex:0];
+            if (  cell.frame.origin.y+cell.frame.size.height >= visibleRect.origin.y ) { rTop = i-1; break; };
+        }
+        if (rTop<0) rTop=0;
+        // find bottom
+        NSInteger rBottom = 0;
+        for (NSInteger i=[gridCellsInfo count]-1; i>=0; i--) {
+            DTGridViewCellInfo* cell = [[gridCellsInfo objectAtIndex:i] objectAtIndex:0];
+            if (  cell.frame.origin.y <= visibleRect.origin.y+visibleRect.size.height ) { rBottom = i+1; break; };
+        }
+        if (rBottom>=[gridCellsInfo count]) rBottom = [gridCellsInfo count]-1;
+        // case "no data" - return rTop = 0, rBottom = -1
+        if (rTop>rBottom) return DTRectMake(0, 0, -1, -1);
+        
+        // find left
+        NSInteger rLeft = [self findNumberOfColumnsForRow:rTop]-1;
+        NSInteger rRight = 0;
+        for (NSInteger i=rLeft; i<=rBottom; i++) {
+            NSArray* row = [gridCellsInfo objectAtIndex:i];
+            for (NSInteger j=0; j<[row count]; j++) {
+                DTGridViewCellInfo* cell = [row objectAtIndex: j];
+                if (cell.frame.origin.x + cell.frame.size.width >= visibleRect.origin.x ) { if (rLeft>j-1) { rLeft = j-1; }; break; };
+            }
+            for (NSInteger j=[row count]-1; j>=0; j--) {
+                DTGridViewCellInfo* cell = [row objectAtIndex: j];
+                if (cell.frame.origin.x <= visibleRect.origin.x+visibleRect.size.width) { if (rRight<j+1) { rRight = j+1; }; break; };
+            }
+        }
+        if (rLeft<0) rLeft = 0;
+        return DTRectMake(rLeft, rTop, rRight, rBottom);
+    }
 }
 
 @end
