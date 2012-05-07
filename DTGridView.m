@@ -33,7 +33,6 @@ NSInteger const DTGridViewInvalid = -1;
 - (void)fireEdgeScroll;
 - (void)decelerationTimer:(NSTimer *)timer;
 - (void)draggingTimer:(NSTimer *)timer;
-NSInteger intSort(id info1, id info2, void *context);
 
 @property (nonatomic, strong) NSTimer *decelerationTimer, *draggingTimer;
 @end
@@ -53,24 +52,6 @@ NSInteger intSort(id info1, id info2, void *context);
 	freeCells = nil;
     gridCellsInfo = nil;
 }
-
-NSInteger intSort(id info1, id info2, void *context) {
-	
-	DTGridViewCellInfo *i1 = (DTGridViewCellInfo *)info1;
-	DTGridViewCellInfo *i2 = (DTGridViewCellInfo *)info2;
-    
-    if (i1.yPosition < i2.yPosition)
-        return NSOrderedAscending;
-    else if (i1.yPosition > i2.yPosition)
-        return NSOrderedDescending;
-    else if (i1.xPosition < i2.xPosition)
-		return NSOrderedAscending;
-	else if (i1.xPosition > i2.xPosition)
-        return NSOrderedDescending;
-	else
-		return NSOrderedSame;
-}
-
 
 - (id)initWithFrame:(CGRect)frame {
 	
@@ -128,7 +109,8 @@ NSInteger intSort(id info1, id info2, void *context) {
     // completely remove cells, put them to freeCells pool
     for (UIView *v in self.subviews)
         if ([v isKindOfClass:[DTGridViewCell class]]) [self removeCellToPool:(DTGridViewCell *)v];
-    
+    // and finally clean pool
+    [freeCells removeAllObjects];
 }
 
 - (void)drawRect:(CGRect)rect {
