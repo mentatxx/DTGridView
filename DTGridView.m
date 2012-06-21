@@ -28,11 +28,15 @@ NSInteger const DTGridViewInvalid = -1;
 @end
 
 @interface DTGridView ()
+{
+    NSArray* columnWidths;
+}
 - (void)dctInternal_setupInternals;
 - (void)loadData;
 - (void)fireEdgeScroll;
 - (void)decelerationTimer:(NSTimer *)timer;
 - (void)draggingTimer:(NSTimer *)timer;
+- (CGFloat)findOffsetXforColumn: (NSInteger) column;
 
 @property (nonatomic, strong) NSTimer *decelerationTimer, *draggingTimer;
 @end
@@ -51,6 +55,7 @@ NSInteger const DTGridViewInvalid = -1;
     
 	freeCells = nil;
     gridCellsInfo = nil;
+    columnWidths = nil;
 }
 
 - (id)initWithFrame:(CGRect)frame {
@@ -141,7 +146,19 @@ NSInteger const DTGridViewInvalid = -1;
                 if ( (x>=0) && (x<[self findNumberOfColumnsForRow:y]) && ![self cellForRow:y column:x]) {
                     DTGridViewCell* newCell = [[self dataSource] gridView:self viewForRow:y column:x];
                     // set geo for cell
-                    CGRect bounds = CGRectMake(x*(defaultColumnWidth+spacingColumns), y*(defaultRowHeight+spacingRows), defaultColumnWidth, defaultRowHeight);
+                    CGFloat offsetX, offsetY, sizeX, sizeY;
+                    if (hasConstantColumnWidth) {
+                        offsetX = x*(defaultColumnWidth+spacingColumns);
+                        offsetY = y*(defaultRowHeight+spacingRows);
+                        sizeX = defaultColumnWidth;
+                        sizeY = defaultRowHeight;
+                    } else {
+                        offsetX = [self findOffsetXforColumn:x];
+                        offsetY = y*(defaultRowHeight+spacingRows);
+                        sizeX = [[columnWidths objectAtIndex:x] floatValue];
+                        sizeY = defaultRowHeight;
+                    }
+                    CGRect bounds = CGRectMake(offsetX, offsetY, sizeX, sizeY);
                     [newCell setFrame:bounds];
                     newCell.xPosition = x;
                     newCell.yPosition = y;
@@ -294,6 +311,17 @@ NSInteger const DTGridViewInvalid = -1;
     if (hasConstantColumnWidth) 
     {
         defaultColumnWidth = [self.dataSource respondsToSelector:@selector(gridView:widthForCellAtRow:column:)] ? [self.dataSource gridView:self widthForCellAtRow:0 column:0] : DTGridViewInvalid;
+        columnWidths = nil;
+    } else
+    {
+        //
+        NSInteger numberOfCols = [self findNumberOfColumnsForRow:0];
+        NSMutableArray* widths = [[NSMutableArray alloc] initWithCapacity:numberOfCols];
+        for (NSInteger i=0; i<numberOfCols; i++) {
+            [widths addObject:[NSNumber numberWithFloat:[self findWidthForRow:0 column:i]]];
+        };
+        columnWidths = [NSArray arrayWithArray:widths];
+        widths = nil;
     }
     
     //
@@ -649,6 +677,16 @@ DTRect DTRectMake( NSInteger left, NSInteger top, NSInteger right, NSInteger bot
         if (rLeft<0) rLeft = 0;
         return DTRectMake(rLeft, rTop, rRight, rBottom);
     }
+}
+
+-(CGFloat)findOffsetXforColumn:(NSInteger)column
+{
+    CGFloat result = 0;
+    CGFloat spacing = [self findSpacingBetweenColumns];
+    for (NSInteger i=0; i<column; i++) {
+        result = result + [[columnWidths objectAtIndex:i] floatValue] + spacing;
+    }
+    return result;
 }
 
 - (BOOL)isOutOfView: (DTGridViewCell*)v Rect:(CGRect)visibleRect
