@@ -663,7 +663,7 @@ DTRect DTRectMake( NSInteger left, NSInteger top, NSInteger right, NSInteger bot
         // find left
         NSInteger rLeft = [self findNumberOfColumnsForRow:rTop]-1;
         NSInteger rRight = 0;
-        for (NSInteger i=rLeft; i<=rBottom; i++) {
+        for (NSInteger i=rTop; i<=rBottom; i++) {
             NSArray* row = [gridCellsInfo objectAtIndex:i];
             for (NSInteger j=0; j<[row count]; j++) {
                 DTGridViewCellInfo* cell = [row objectAtIndex: j];
@@ -675,7 +675,8 @@ DTRect DTRectMake( NSInteger left, NSInteger top, NSInteger right, NSInteger bot
             }
         }
         if (rLeft<0) rLeft = 0;
-        return DTRectMake(rLeft, rTop, rRight, rBottom);
+        DTRect result = DTRectMake(rLeft, rTop, rRight, rBottom);
+        return result;
     }
 }
 
