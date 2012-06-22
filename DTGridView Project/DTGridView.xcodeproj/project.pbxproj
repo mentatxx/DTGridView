@@ -11,10 +11,10 @@
 		17AEB8C31593804F00F08D45 /* DTGridView.m in Sources */ = {isa = PBXBuildFile; fileRef = 24388EA212B8D4F800848476 /* DTGridView.m */; };
 		17AEB8C41593804F00F08D45 /* DTGridViewCell.m in Sources */ = {isa = PBXBuildFile; fileRef = 24388EA412B8D4F800848476 /* DTGridViewCell.m */; };
 		17AEB8C51593804F00F08D45 /* DTGridViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 24388EA712B8D4F800848476 /* DTGridViewController.m */; };
-		17AEB8C61593805E00F08D45 /* DTGridView.h in Headers */ = {isa = PBXBuildFile; fileRef = 24388EA112B8D4F800848476 /* DTGridView.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		17AEB8C71593805E00F08D45 /* DTGridViewCell.h in Headers */ = {isa = PBXBuildFile; fileRef = 24388EA312B8D4F800848476 /* DTGridViewCell.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		17AEB8C81593805E00F08D45 /* DTGridViewCellInfoProtocol.h in Headers */ = {isa = PBXBuildFile; fileRef = 24388EA512B8D4F800848476 /* DTGridViewCellInfoProtocol.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		17AEB8C91593805E00F08D45 /* DTGridViewController.h in Headers */ = {isa = PBXBuildFile; fileRef = 24388EA612B8D4F800848476 /* DTGridViewController.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		17AEB8C61593805E00F08D45 /* DTGridView.h in Headers */ = {isa = PBXBuildFile; fileRef = 24388EA112B8D4F800848476 /* DTGridView.h */; settings = {ATTRIBUTES = (); }; };
+		17AEB8C71593805E00F08D45 /* DTGridViewCell.h in Headers */ = {isa = PBXBuildFile; fileRef = 24388EA312B8D4F800848476 /* DTGridViewCell.h */; settings = {ATTRIBUTES = (); }; };
+		17AEB8C81593805E00F08D45 /* DTGridViewCellInfoProtocol.h in Headers */ = {isa = PBXBuildFile; fileRef = 24388EA512B8D4F800848476 /* DTGridViewCellInfoProtocol.h */; settings = {ATTRIBUTES = (); }; };
+		17AEB8C91593805E00F08D45 /* DTGridViewController.h in Headers */ = {isa = PBXBuildFile; fileRef = 24388EA612B8D4F800848476 /* DTGridViewController.h */; settings = {ATTRIBUTES = (); }; };
 		1D3623260D0F684500981E51 /* DTGridViewAppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 1D3623250D0F684500981E51 /* DTGridViewAppDelegate.m */; };
 		1D60589B0D05DD56006BFB54 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 29B97316FDCFA39411CA2CEA /* main.m */; };
 		1D60589F0D05DD5A006BFB54 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1D30AB110D05D00D00671497 /* Foundation.framework */; };
@@ -476,6 +476,7 @@
 				17AEB8C01593800600F08D45 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 		1D6058960D05DD3E006BFB54 /* Build configuration list for PBXNativeTarget "DTGridView" */ = {
 			isa = XCConfigurationList;
