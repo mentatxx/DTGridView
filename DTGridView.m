@@ -163,6 +163,7 @@ NSInteger const DTGridViewInvalid = -1;
                     newCell.xPosition = x;
                     newCell.yPosition = y;
                     newCell.frame = bounds;
+                    newCell.delegate = self;
                     // add as subview
                     [self insertSubview:newCell atIndex:0];
                 }

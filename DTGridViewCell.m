@@ -43,7 +43,7 @@
 
 - (void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event {
 	self.highlighted = YES;
-	[super touchesEnded:touches withEvent:event];
+	[super touchesBegan:touches withEvent:event];
 }
 
 - (void)touchesCancelled:(NSSet *)touches withEvent:(UIEvent *)event {
@@ -54,7 +54,8 @@
 - (void)touchesEnded:(NSSet *)touches withEvent:(UIEvent *)event {
 	self.highlighted = NO;
 	[[self gridView] selectRow:self.yPosition column:self.xPosition scrollPosition:DTGridViewScrollPositionNone animated:YES];
-	[self.delegate gridViewCellWasTouched:self];
+    if ([delegate respondsToSelector:@selector(gridViewCellWasTouched:)])
+        [self.delegate gridViewCellWasTouched:self];
 	[super touchesEnded:touches withEvent:event];
 }
 
