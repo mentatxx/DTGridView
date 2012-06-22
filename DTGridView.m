@@ -598,7 +598,7 @@ NSInteger const DTGridViewInvalid = -1;
 
 - (void)gridViewCellWasTouched:(DTGridViewCell *)cell {
 	
-	[self bringSubviewToFront:cell];
+//	[self bringSubviewToFront:cell];
 	
 	if ([self.delegate respondsToSelector:@selector(gridView:selectionMadeAtRow:column:)])
 		[self.delegate gridView:self selectionMadeAtRow:cell.yPosition column:cell.xPosition];
